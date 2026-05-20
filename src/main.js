@@ -13,8 +13,8 @@ import {initSorting} from "./components/sorting.js";
 import {initFiltering} from "./components/filtering.js";
 import {initSearching} from "./components/searching.js";
 
-// Исходные данные используемые в render()
-const {data, ...indexes} = initData(sourceData);
+// Шаг 1. Присваиваем вызов функции константе api
+const api = initData(sourceData);
 
 /**
  * Сбор и обработка полей из таблицы
@@ -34,18 +34,24 @@ function collectState() {
 
 /**
  * Перерисовка состояния таблицы при любых изменениях
+ * Функция стала асинхронной (async)
  * @param {HTMLButtonElement?} action
  */
-function render(action) {
+async function render(action) {
     let state = collectState(); // состояние полей из таблицы
-    let result = [...data]; // копируем для последующего изменения
-    // @todo: использование
-    result = applySearching(result, state, action);
-    result = applyFiltering(result, state, action);
-    result = applySorting(result, state, action);
-    result = applyPagination(result, state, action);
-
-    sampleTable.render(result)
+    // Шаг 2.1
+    let query = {};
+    // @todo: использование  ВРЕМЕННО ЗАКОММЕНТИРОВАНО ДЛЯ ШАГА 0
+    query = applySearching(query, state, action);
+    query = applyFiltering(query, state, action);
+    query = applySorting(query, state, action);
+    query = applyPagination(query, state, action); 
+    // Шаг 2.2.
+    const { total, items } = await api.getRecords(query);
+    // Перерисовываем пагинатор и обновляем статусы (строки от-до), используя total от сервера
+    updatePagination(total, query);
+    // Шаг 2.3
+    sampleTable.render(items)
 }
 
 const sampleTable = initTable({
@@ -58,16 +64,20 @@ const sampleTable = initTable({
 // @todo: инициализация
 const applySearching = initSearching('search');
 
-const applyFiltering = initFiltering(sampleTable.filter.elements, {    // передаём элементы фильтра
-    searchBySeller: indexes.sellers                                    // для элемента с именем searchBySeller устанавливаем массив продавцов
-});
+// ЗАКОММЕНТИРОВАНО ДЛЯ ШАГА 0
+// const applyFiltering = initFiltering(sampleTable.filter.elements, {    // передаём элементы фильтра
+//    searchBySeller: indexes.sellers                                    // для элемента с именем searchBySeller устанавливаем массив продавцов
+// });
+
+// Шаг 3. Деструктурируем возвращаемый объект фильтрации
+const {applyFiltering, updateIndexes} = initFiltering(sampleTable.filter.elements);
 
 const applySorting = initSorting([        // Нам нужно передать сюда массив элементов, которые вызывают сортировку, чтобы изменять их визуальное представление
     sampleTable.header.elements.sortByDate,
     sampleTable.header.elements.sortByTotal
 ]);
 
-const applyPagination = initPagination(
+const {applyPagination, updatePagination} = initPagination(
     sampleTable.pagination.elements,             // передаём сюда элементы пагинации, найденные в шаблоне
     (el, page, isCurrent) => {                    // и колбэк, чтобы заполнять кнопки страниц данными
         const input = el.querySelector('input');
@@ -83,4 +93,16 @@ const applyPagination = initPagination(
 const appRoot = document.querySelector('#app');
 appRoot.appendChild(sampleTable.container);
 
-render();
+// Шаг 3
+async function init() {
+    // Шаг 3.1
+    const indexes = await api.getIndexes();
+
+    // Передаем элементы фильтра и конкретный индекс продавцов для выпадающего списка
+    updateIndexes(sampleTable.filter.elements, {
+        searchBySeller: indexes.sellers
+    });
+}
+
+// Шаг 3.2
+init().then(render);

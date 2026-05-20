@@ -1,31 +1,36 @@
-import {sortCollection, sortMap} from "../lib/sort.js";
+import {sortMap} from "../lib/sort.js"; // sortCollection больше не нужен, удаляем его из импорта
 
 export function initSorting(columns) {
-    return (data, state, action) => {
+    return (query, state, action) => { // Переименовали первый аргумент data в query
         let field = null;
         let order = null;
 
         if (action && action.name === 'sort') {
             // @todo: #3.1 — запомнить выбранный режим сортировки
-            action.value = sortMap[action.value];
-            field = action.dataset.field;                            // Информация о сортируемом поле есть также в кнопке
-            order = action.dataset.value;                            // Направление заберём прямо из датасета для точности
+            action.dataset.value = sortMap[action.dataset.value]; // Переключаем значение в датасете по кругу
+            field = action.dataset.field;                         // Получаем имя поля
+            order = action.dataset.value;                         // Получаем новое направление сортировки
+
             // @todo: #3.2 — сбросить сортировки остальных колонок
-            columns.forEach(column => {                                    // Перебираем элементы (в columns у нас массив кнопок)
-                if (column.dataset.field !== action.dataset.field) {    // Если это не та кнопка, что нажал пользователь
-                    column.dataset.value = 'none';                        // тогда сбрасываем её в начальное состояние
+            columns.forEach(column => {                                    
+                if (column.dataset.field !== action.dataset.field) {    
+                    column.dataset.value = 'none';                        
                 }
             }); 
         } else {
             // @todo: #3.3 — получить выбранный режим сортировки
-            columns.forEach(column => {                        // Перебираем все наши кнопки сортировки
-                if (column.dataset.value !== 'none') {        // Ищем ту, что находится не в начальном состоянии (предполагаем, что одна)
-                    field = column.dataset.field;            // Сохраняем в переменных поле
-                    order = column.dataset.value;            // и направление сортировки
+            columns.forEach(column => {                        
+                if (column.dataset.value !== 'none') {        
+                    field = column.dataset.field;            
+                    order = column.dataset.value;            
                 }
             }); 
         }
 
-        return sortCollection(data, field, order);
+        // Формируем параметр сортировки в виде строки "имя_поля:направление", если сортировка активна
+        const sort = (field && order !== 'none') ? `${field}:${order}` : null; 
+
+        // По общему принципу: если есть сортировка — подмешиваем в query, если нет — возвращаем query без изменений
+        return sort ? Object.assign({}, query, { sort }) : query; 
     }
 }
